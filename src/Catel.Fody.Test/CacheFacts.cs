@@ -14,7 +14,7 @@ namespace Catel.Fody.Test
     public class CacheFacts
     {
         [TestMethod]
-        public void SecondCallIsFasterThanFirstOne()
+        public void SecondCallIsFasterThanTheFirstOne()
         {
             var type = AssemblyWeaver.Assembly.GetType("Catel.Fody.TestAssembly.CacheClass");
 
@@ -31,6 +31,20 @@ namespace Catel.Fody.Test
             TimeSpan secondCallElapsedTime = DateTime.Now.Subtract(startTime);
 
             Assert.IsTrue(secondCallElapsedTime < firstCallElapsedTime);
+        }
+
+        [TestMethod]
+        public void ReturnsTheExpectedValue()
+        {
+            var type = AssemblyWeaver.Assembly.GetType("Catel.Fody.TestAssembly.CacheClass");
+
+            var instance = Activator.CreateInstance(type);
+
+            var method = type.GetMethod("GetFromCache");
+
+            var result = (string)method.Invoke(instance, new object[] { "theKey" });
+
+            Assert.AreEqual("THEKEY", result);
         }
     }
 }

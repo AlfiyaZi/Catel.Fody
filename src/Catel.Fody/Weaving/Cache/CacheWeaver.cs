@@ -13,7 +13,6 @@ namespace Catel.Fody.Weaving.Cache
     using Mono.Cecil;
     using Mono.Cecil.Cil;
     using Mono.Cecil.Rocks;
-    using Mono.Collections.Generic;
 
     public class CacheWeaver
     {
