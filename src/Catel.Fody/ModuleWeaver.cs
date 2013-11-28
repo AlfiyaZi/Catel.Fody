@@ -98,7 +98,11 @@ namespace Catel.Fody
             var argumentWeaverService = new ArgumentWeaverService(types);
             argumentWeaverService.Execute();
 
-            // 5th step: Xml schema weaving
+            // 5th step: Cache weaving
+            var cacheWeaverService = new CacheWeaverService(types);
+            cacheWeaverService.Execute();
+
+            // 6th step: Xml schema weaving
             var xmlSchemasWeaverService = new XmlSchemasWeaverService(msCoreReferenceFinder, typeNodeBuilder);
             xmlSchemasWeaverService.Execute();
 

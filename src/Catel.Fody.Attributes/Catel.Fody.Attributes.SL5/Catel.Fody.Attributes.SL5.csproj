@@ -95,6 +95,9 @@
     <Compile Include="..\Catel.Fody.Attributes.NET40\ArgumentAttributes\MaximumAttribute.cs">
       <Link>ArgumentAttributes\MaximumAttribute.cs</Link>
     </Compile>
+    <Compile Include="..\Catel.Fody.Attributes.NET40\CacheAttribute.cs">
+      <Link>CacheAttribute.cs</Link>
+    </Compile>
     <Compile Include="..\Catel.Fody.Attributes.NET40\NoWeavingAttribute.cs">
       <Link>NoWeavingAttribute.cs</Link>
     </Compile>

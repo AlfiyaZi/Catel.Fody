@@ -19,6 +19,11 @@ namespace Catel.Fody
             return GetAttribute(typeDefinition.CustomAttributes, attributeName);
         }
 
+        public static CustomAttribute GetAttribute(this MethodDefinition methodDefinition, string attributeName)
+        {
+            return GetAttribute(methodDefinition.CustomAttributes, attributeName);
+        }
+
         public static CustomAttribute GetAttribute(this PropertyDefinition propertyDefinition, string attributeName)
         {
             return GetAttribute(propertyDefinition.CustomAttributes, attributeName);
@@ -69,6 +74,11 @@ namespace Catel.Fody
         public static void RemoveAttribute(this TypeDefinition typeDefinition, string attributeName)
         {
             RemoveAttribute(typeDefinition.CustomAttributes, attributeName);
+        }
+
+        public static void RemoveAttribute(this MethodDefinition methodDefinition, string attributeName)
+        {
+            RemoveAttribute(methodDefinition.CustomAttributes, attributeName);
         }
 
         public static void RemoveAttribute(this ParameterDefinition typeDefinition, string attributeName)

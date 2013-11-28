@@ -74,6 +74,7 @@
   <ItemGroup>
     <Compile Include="ArgumentFacts.cs" />
     <Compile Include="AssemblyWeaver.cs" />
+    <Compile Include="CacheFacts.cs" />
     <Compile Include="DefaultValueFacts.cs" />
     <Compile Include="ExposeFacts.cs" />
     <Compile Include="InheritanceFacts.cs" />
