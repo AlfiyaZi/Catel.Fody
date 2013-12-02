@@ -29,7 +29,8 @@ namespace Catel.Fody.Services
         {
             foreach (var typeDefinition in _types)
             {
-                new CacheWeaver(typeDefinition).Execute();
+                var weaver = new CacheWeaver(typeDefinition);
+                weaver.Execute();
             }
         }
     }

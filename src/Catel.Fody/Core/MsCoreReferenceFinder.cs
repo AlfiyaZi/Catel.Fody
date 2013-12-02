@@ -38,6 +38,7 @@ namespace Catel.Fody
                 ExecuteWinRT();
                 return;
             }
+
             var module = _moduleWeaver.ModuleDefinition;
             var constructorDefinition = objectDefinition.Methods.First(x => x.IsConstructor);
             ObjectConstructor = module.Import(constructorDefinition);

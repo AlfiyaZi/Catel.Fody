@@ -28,7 +28,7 @@ namespace Catel.Fody.TestAssembly
         public string GetFromCache2(string key)
         {
             string theKey = string.Format("{0}", key);
-            Func<string> code = () => this.____GetFromCache2(key);
+            Func<string> code = () => ____GetFromCache2(key);
             return this.____GetFromCache2CacheStorage.GetFromCacheOrFetch(theKey, code, null, false);
         }
 

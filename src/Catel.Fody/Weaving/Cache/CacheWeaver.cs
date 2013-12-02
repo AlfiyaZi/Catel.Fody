@@ -30,21 +30,31 @@ namespace Catel.Fody.Weaving.Cache
         #region Methods
         public void Execute()
         {
-            List<MethodDefinition> methodDefinitions = _type.Methods.ToList();
-            foreach (var originalMethodDefinition in methodDefinitions)
+            var module = _type.Module;
+            var stringType = module.FindType("mscorlib", "System.String");
+            var funcType = module.FindType("mscorlib", "System.Func`1");
+
+            var methodDefinitions = _type.Methods.ToList();
+            foreach (var methodDefinition in methodDefinitions)
             {
-                CustomAttribute cacheAttribute = originalMethodDefinition.GetAttribute("Catel.Fody.Cache");
+                CustomAttribute cacheAttribute = methodDefinition.GetAttribute("Catel.Fody.Cache");
                 if (cacheAttribute != null)
                 {
-                    // TODO: Compute the unique name for field and shalow method copy
-                    string uniqueName = "_____" + originalMethodDefinition.Name;
+                    // TODO: Compute the unique name for field and shallow method copy
+                    string uniqueName = "_____" + methodDefinition.Name;
 
-                    CreateACopyOfMethodAs(uniqueName, originalMethodDefinition);
-                    CreateCacheStorageField(string.Format(CultureInfo.InvariantCulture, "{0}CacheStorage", uniqueName), FodyEnvironment.ModuleDefinition.FindType("mscorlib", "System.String"), originalMethodDefinition.ReturnType);
+                    var clonedMethodDefinition = CloneMethod(uniqueName, methodDefinition);
+                    var cacheStorageField = CreateCacheStorageField(string.Format(CultureInfo.InvariantCulture, "{0}CacheStorage", uniqueName), FodyEnvironment.ModuleDefinition.FindType("mscorlib", "System.String"), methodDefinition.ReturnType);
 
-                    originalMethodDefinition.Body.Instructions.Clear();
+                    var methodBody = methodDefinition.Body;
+                    var instructions = methodBody.Instructions;
+                    instructions.Clear();
 
                     /*
+                        string str = string.Format("{0}", key);
+                        Func<string> code = () => this.____GetFromCache2(key);
+                        return ____GetFromCache2CacheStorage.GetFromCacheOrFetch(str, code, null, false);
+                     
                         IL_0000: newobj instance void Catel.Fody.TestAssembly.CacheClass/'<>c__DisplayClass1'::.ctor()
                         IL_0005: stloc.0
                         IL_0006: ldloc.0
@@ -71,19 +81,62 @@ namespace Catel.Fody.Weaving.Cache
                         IL_0041: ldloc.1
                         IL_0042: ret
                     */
+
+                    var keyNameVariable = new VariableDefinition("keyNameVariable", stringType);
+                    methodBody.Variables.Add(keyNameVariable);
+
+                    var genericFuncType = funcType.MakeGenericInstanceType(methodDefinition.ReturnType);
+ 
+                    var addToCacheFunctionVariable = new VariableDefinition("addToCacheFunction", module.Import(genericFuncType));
+                    methodBody.Variables.Add(addToCacheFunctionVariable);
+
+                    // string str = string.Format("{0}", key);
+                    var formattingString = (string)cacheAttribute.ConstructorArguments[0].Value;
+                    instructions.Add(Instruction.Create(OpCodes.Ldstr, formattingString));
+
+                    foreach (var parameter in methodDefinition.Parameters)
+                    {
+                        instructions.Add(Instruction.Create(OpCodes.Ldarg, parameter));
+                    }
+
+                    instructions.Add(Instruction.Create(OpCodes.Ldloc, keyNameVariable));
+
+                    var formatMethod = module.Import((from method in stringType.Methods
+                                                      where string.Equals(method.Name, "Format") &&
+                                                            method.Parameters.Count == 2 &&
+                                                            method.Parameters[1].ParameterType.IsArray
+                                                      select method).First());
+
+                    instructions.Add(Instruction.Create(OpCodes.Call, formatMethod));
+
+                    // Func<string> code = () => this.____GetFromCache2(key);
+                    instructions.Add(Instruction.Create(OpCodes.Ldloc, addToCacheFunctionVariable));
+
+                    // TODO: Create display class, etc
+
+
+                    // return ____GetFromCache2CacheStorage.GetFromCacheOrFetch(str, code, null, false);
+                    // TODO: Load variables
+
+                    var getCacheStorageMethod = module.Import((from method in cacheStorageField.FieldType.Resolve().Methods
+                                                               where string.Equals(method.Name, "GetFromCacheOrFetch")
+                                                               select method).First());
+                    instructions.Add(Instruction.Create(OpCodes.Callvirt, getCacheStorageMethod));
+
+                    methodBody.OptimizeMacros();
                 }
 
-                originalMethodDefinition.RemoveAttribute("Catel.Fody.Cache");
+                methodDefinition.RemoveAttribute("Catel.Fody.Cache");
             }
         }
 
-        private void CreateCacheStorageField(string uniqueName, TypeDefinition keyType, TypeReference resultType)
+        private FieldDefinition CreateCacheStorageField(string uniqueName, TypeDefinition keyType, TypeReference resultType)
         {
-            ModuleDefinition moduleDefinition = FodyEnvironment.ModuleDefinition;
+            var moduleDefinition = FodyEnvironment.ModuleDefinition;
             var cacheStorageGenericInstanteType = moduleDefinition.FindType("Catel.Core", "Catel.Caching.CacheStorage`2").MakeGenericInstanceType(keyType, resultType);
             var cacheStorageGenericConstructor = cacheStorageGenericInstanteType.Resolve().GetConstructors().FirstOrDefault().MakeGeneric(cacheStorageGenericInstanteType);
 
-            TypeReference importedType = _type.Module.Import(cacheStorageGenericInstanteType);
+            var importedType = _type.Module.Import(cacheStorageGenericInstanteType);
             var fieldDefinition = new FieldDefinition(uniqueName, FieldAttributes.Private | FieldAttributes.InitOnly, importedType);
 
             _type.Fields.Add(fieldDefinition);
@@ -92,7 +145,7 @@ namespace Catel.Fody.Weaving.Cache
             {
                 var defaultConstructor = new MethodDefinition(".cctor", MethodAttributes.Private | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName, _type.Module.Import(typeof(void)));
                 _type.Methods.Add(defaultConstructor);
-                
+
                 // TODO: Make the base call. 
                 /*
                  IL_000e: call instance void [mscorlib]System.Object::.ctor()
@@ -107,11 +160,11 @@ namespace Catel.Fody.Weaving.Cache
                 IL_0008: stfld class [Catel.Core]Catel.Caching.CacheStorage`2<string, string> Catel.Fody.TestAssembly.CacheClass::_getSomething2
                 IL_000d: ldarg.0
            */
-            
-            foreach (MethodDefinition methodDefinition in this._type.GetConstructors())
+
+            foreach (var methodDefinition in _type.GetConstructors())
             {
                 methodDefinition.Body.SimplifyMacros();
-                
+
                 methodDefinition.Body.Instructions.Insert(0, new List<Instruction>
                                                                  {
                                                                      Instruction.Create(OpCodes.Ldarg_0), 
@@ -123,17 +176,19 @@ namespace Catel.Fody.Weaving.Cache
                                                                  });
                 methodDefinition.Body.OptimizeMacros();
             }
+
+            return fieldDefinition;
         }
 
-        private void CreateACopyOfMethodAs(string uniqueName, MethodDefinition originalMethodDefinition)
+        private MethodDefinition CloneMethod(string uniqueName, MethodDefinition originalMethodDefinition)
         {
-            var shallowMethodDefinition = new MethodDefinition(uniqueName, originalMethodDefinition.Attributes, originalMethodDefinition.ReturnType);
+            var clonedMethodDefinition = new MethodDefinition(uniqueName, originalMethodDefinition.Attributes, originalMethodDefinition.ReturnType);
 
             if (originalMethodDefinition.HasParameters)
             {
                 foreach (var parameter in originalMethodDefinition.Parameters)
                 {
-                    shallowMethodDefinition.Parameters.Add(parameter);
+                    clonedMethodDefinition.Parameters.Add(parameter);
                 }
             }
 
@@ -143,7 +198,7 @@ namespace Catel.Fody.Weaving.Cache
                 {
                     foreach (var instruction in originalMethodDefinition.Body.Variables)
                     {
-                        shallowMethodDefinition.Body.Variables.Add(instruction);
+                        clonedMethodDefinition.Body.Variables.Add(instruction);
                     }
                 }
 
@@ -151,18 +206,24 @@ namespace Catel.Fody.Weaving.Cache
                 {
                     foreach (var exceptionHandler in originalMethodDefinition.Body.ExceptionHandlers)
                     {
-                        shallowMethodDefinition.Body.ExceptionHandlers.Add(exceptionHandler);
+                        clonedMethodDefinition.Body.ExceptionHandlers.Add(exceptionHandler);
                     }
                 }
 
                 foreach (var instruction in originalMethodDefinition.Body.Instructions)
                 {
-                    shallowMethodDefinition.Body.Instructions.Add(instruction);
+                    clonedMethodDefinition.Body.Instructions.Add(instruction);
                 }
             }
 
-            shallowMethodDefinition.IsPrivate = true;
-            _type.Methods.Add(shallowMethodDefinition);
+            clonedMethodDefinition.IsPrivate = true;
+
+            var compilerGeneratedAttribute = originalMethodDefinition.Module.FindType("mscorlib", "System.Runtime.CompilerServices.CompilerGeneratedAttribute");
+            clonedMethodDefinition.CustomAttributes.Add(new CustomAttribute(originalMethodDefinition.DeclaringType.Module.Import(compilerGeneratedAttribute.Resolve().Constructor(false))));
+
+            _type.Methods.Add(clonedMethodDefinition);
+
+            return clonedMethodDefinition;
         }
         #endregion
     }
